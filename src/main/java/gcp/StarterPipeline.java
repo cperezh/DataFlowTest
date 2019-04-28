@@ -25,6 +25,7 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.PCollection;
+import org.apache.tomcat.jni.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,9 +52,9 @@ public class StarterPipeline {
 	private static final Logger LOG = LoggerFactory.getLogger(StarterPipeline.class);
 
 	public static void main(String[] args) {
-		
-		//TODO Pasar los parametros por codigo
-		
+
+		// TODO Pasar los parametros por codigo
+
 		// Start by defining the options for the pipeline.
 		PipelineOptions options = PipelineOptionsFactory.fromArgs(args).withValidation().create();
 
@@ -62,22 +63,33 @@ public class StarterPipeline {
 
 		// Leemos las filas de la tabla
 		PCollection<TableRow> tabla1 = p.apply(BigQueryIO.readTableRows().from("third-crossing-236813:Prueba.Tabla1"));
-		
-		
-		PCollection<String> tabla1String = tabla1.apply("to_string", ParDo.of( new ProcesarFilasAString()));
-		
-		tabla1String.apply(TextIO.write().to("c:/users/Carlos/file.txt"));
 
+		PCollection<String> tabla1String = tabla1.apply("to_string", ParDo.of(new ProcesarFilasAString()));
+
+		tabla1String.apply(TextIO.write().to("c:/users/Carlos/file").withSuffix(".txt"));
 
 		p.run();
 	}
-	
-	private static class ProcesarFilasAString extends DoFn<TableRow, String>{
-		
+
+	/**
+	 * Procesador que transforma filas de BigQuery (TableRow) en String
+	 * Contiene un metido etiquetado @ProcessElement que es el que trabaja 1 a 1 
+	 * los elementos de la PCollection sobre la que se ejecuta.
+	 * De entrada recibe una fila, etiquetada como @Element y de salida un String en el OutpurReciever
+	 * @author Carlos
+	 *
+	 */
+	private static class ProcesarFilasAString extends DoFn<TableRow, String> {
+
 		@ProcessElement
 		public void processElement(@Element TableRow fila, OutputReceiver<String> filaString) {
-			filaString.output(fila.toString());
+			
+			//Filtro todos los nombres que empiecen por A
+			if (!((String)fila.get("nombre")).toUpperCase().startsWith("A")) {
+				filaString.output(fila.toString());
+			}
+
 		}
-		
+
 	}
 }
