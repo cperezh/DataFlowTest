@@ -18,6 +18,7 @@
 package gcp;
 
 import org.apache.beam.sdk.Pipeline;
+import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
@@ -48,13 +49,21 @@ public class StarterPipeline {
 	private static final Logger LOG = LoggerFactory.getLogger(StarterPipeline.class);
 
 	public static void main(String[] args) {
+		
+		//TODO Pasar los parametros por codigo
+		
 		// Start by defining the options for the pipeline.
 		PipelineOptions options = PipelineOptionsFactory.fromArgs(args).withValidation().create();
 
 		// Then create the pipeline.
 		Pipeline p = Pipeline.create(options);
 
+		// Leemos las filas de la tabla
 		PCollection<TableRow> weatherData = p.apply(BigQueryIO.readTableRows().from("third-crossing-236813:Prueba.Tabla1"));
+		
+		//weatherData.apply(TextIO.write().to("c:/file.txt"));
+
+		//PCollectionView<Iterable<TableRow>> output = weatherData.apply(View.<TableRow>asIterable());
 
 		p.run();
 	}
