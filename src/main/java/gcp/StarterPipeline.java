@@ -20,12 +20,13 @@ package gcp;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.TextIO;
 import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
+import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
+import org.apache.beam.sdk.options.ValueProvider.StaticValueProvider;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.PCollection;
-import org.apache.tomcat.jni.File;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,14 +50,16 @@ import com.google.api.services.bigquery.model.TableRow;
  * --stagingLocation=<STAGING_LOCATION_IN_CLOUD_STORAGE> --runner=DataflowRunner
  */
 public class StarterPipeline {
+
 	private static final Logger LOG = LoggerFactory.getLogger(StarterPipeline.class);
 
 	public static void main(String[] args) {
 
 		// TODO Pasar los parametros por codigo
+		String[] parameters = { "--tempLocation=gs://prueba_cs/temp", "--project=third-crossing-236813" };
 
 		// Start by defining the options for the pipeline.
-		PipelineOptions options = PipelineOptionsFactory.fromArgs(args).withValidation().create();
+		PipelineOptions options = PipelineOptionsFactory.fromArgs(parameters).withValidation().create();
 
 		// Then create the pipeline.
 		Pipeline p = Pipeline.create(options);
@@ -68,28 +71,60 @@ public class StarterPipeline {
 
 		tabla1String.apply(TextIO.write().to("c:/users/Carlos/file").withSuffix(".txt"));
 
+		// Prueba de PUBSUB
+
+		String subscription = "projects/third-crossing-236813/subscriptions/suscri_test";
+		// PubsubIO.Read<String> read =
+		// PubsubIO.readStrings().fromSubscription(StaticValueProvider.of(subscription));
+
+		PCollection<String> mensajes = p
+				.apply(PubsubIO.readStrings().fromSubscription(StaticValueProvider.of(subscription)));
+
+		PCollection mensajesSalida = mensajes.apply("pub/sub", ParDo.of(new ProcesarMensajes()));
+		
+		mensajesSalida.apply(TextIO.write().to("c:/users/Carlos/Mesnajesfile").withSuffix(".txt"));
+
+		LOG.debug("PRUEBA");
+
 		p.run();
+
+		LOG.debug("FIN_PRUEBA");
 	}
 
 	/**
-	 * Procesador que transforma filas de BigQuery (TableRow) en String
-	 * Contiene un metido etiquetado @ProcessElement que es el que trabaja 1 a 1 
-	 * los elementos de la PCollection sobre la que se ejecuta.
-	 * De entrada recibe una fila, etiquetada como @Element y de salida un String en el OutpurReciever
+	 * Procesador que transforma filas de BigQuery (TableRow) en String Contiene un
+	 * metido etiquetado @ProcessElement que es el que trabaja 1 a 1 los elementos
+	 * de la PCollection sobre la que se ejecuta. De entrada recibe una fila,
+	 * etiquetada como @Element y de salida un String en el OutpurReciever
+	 * 
 	 * @author Carlos
 	 *
 	 */
 	private static class ProcesarFilasAString extends DoFn<TableRow, String> {
 
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+
 		@ProcessElement
 		public void processElement(@Element TableRow fila, OutputReceiver<String> filaString) {
-			
-			//Filtro todos los nombres que empiecen por A
-			if (!((String)fila.get("nombre")).toUpperCase().startsWith("A")) {
+
+			// Filtro todos los nombres que empiecen por A
+			if (!((String) fila.get("nombre")).toUpperCase().startsWith("A")) {
 				filaString.output(fila.toString());
 			}
 
 		}
 
+	}
+
+	private static class ProcesarMensajes extends DoFn<String, String> {
+		@ProcessElement
+		public void processElement(@Element String entrada, OutputReceiver<String> salida) {
+
+			salida.output(entrada);
+
+		}
 	}
 }
