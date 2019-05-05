@@ -18,9 +18,8 @@
 package gcp;
 
 import org.apache.beam.sdk.Pipeline;
-import org.apache.beam.sdk.io.TextIO;
-import org.apache.beam.sdk.io.gcp.bigquery.BigQueryIO;
 import org.apache.beam.sdk.io.gcp.pubsub.PubsubIO;
+import org.apache.beam.sdk.io.gcp.pubsub.PubsubMessage;
 import org.apache.beam.sdk.options.PipelineOptions;
 import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider.StaticValueProvider;
@@ -64,31 +63,27 @@ public class StarterPipeline {
 		// Then create the pipeline.
 		Pipeline p = Pipeline.create(options);
 
-		// Leemos las filas de la tabla
-		PCollection<TableRow> tabla1 = p.apply(BigQueryIO.readTableRows().from("third-crossing-236813:Prueba.Tabla1"));
-
-		PCollection<String> tabla1String = tabla1.apply("to_string", ParDo.of(new ProcesarFilasAString()));
-
-		tabla1String.apply(TextIO.write().to("c:/users/Carlos/file").withSuffix(".txt"));
+//		// Leemos las filas de la tabla
+//		PCollection<TableRow> tabla1 = p.apply(BigQueryIO.readTableRows().from("third-crossing-236813:Prueba.Tabla1"));
+//
+//		PCollection<String> tabla1String = tabla1.apply("to_string", ParDo.of(new ProcesarFilasAString()));
+//
+//		tabla1String.apply(TextIO.write().to("c:/users/Carlos/file").withSuffix(".txt"));
+		
 
 		// Prueba de PUBSUB
 
 		String subscription = "projects/third-crossing-236813/subscriptions/suscri_test";
-		// PubsubIO.Read<String> read =
-		// PubsubIO.readStrings().fromSubscription(StaticValueProvider.of(subscription));
 
-		PCollection<String> mensajes = p
-				.apply(PubsubIO.readStrings().fromSubscription(StaticValueProvider.of(subscription)));
+		//Leo de la subscripcion
+		PCollection<PubsubMessage> mensajes = p
+				.apply(PubsubIO.readMessagesWithAttributes().fromSubscription(StaticValueProvider.of(subscription)));
 
-		PCollection mensajesSalida = mensajes.apply("pub/sub", ParDo.of(new ProcesarMensajes()));
-		
-		mensajesSalida.apply(TextIO.write().to("c:/users/Carlos/Mesnajesfile").withSuffix(".txt"));
-
-		LOG.debug("PRUEBA");
+		//Proceso los mensajes de la cola
+		mensajes.apply("pub/sub", ParDo.of(new ProcesarMensajes()));
 
 		p.run();
 
-		LOG.debug("FIN_PRUEBA");
 	}
 
 	/**
@@ -119,11 +114,25 @@ public class StarterPipeline {
 
 	}
 
-	private static class ProcesarMensajes extends DoFn<String, String> {
-		@ProcessElement
-		public void processElement(@Element String entrada, OutputReceiver<String> salida) {
+	/**
+	 * Procesa mensajes del PubSub y los convierte en String
+	 * @author Carlos
+	 *
+	 */
+	private static class ProcesarMensajes extends DoFn<PubsubMessage, String> {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
 
-			salida.output(entrada);
+		@ProcessElement
+		public void processElement(@Element PubsubMessage entrada, OutputReceiver<String> salida) {
+
+			salida.output(new String(entrada.getPayload()));
+			
+			System.out.println("SALIDA_buena--> "+new String(entrada.getPayload()));
+			
+			System.out.println("OTRA SALIDA--> "+entrada.getAttributeMap());
 
 		}
 	}
